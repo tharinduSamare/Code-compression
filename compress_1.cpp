@@ -6,8 +6,8 @@ using namespace std;
 
 const int DICTIONARY_SIZE = 16;
 const int MAX_SIZE = 1024;
-static int original_data[MAX_SIZE];
-static int dictionary[16];
+static unsigned int original_data[MAX_SIZE];
+static unsigned int dictionary[16];
 
 
 int Read_original();
@@ -34,7 +34,7 @@ int Read_original(){
 
   int i = 0;
   while (getline (original_file, uncompressed_line)) {
-    original_data[i] = string_to_int(uncompressed_line);
+    original_data[i] = (unsigned int )string_to_int(uncompressed_line);
     i++;
   }
   original_file.close();
@@ -218,12 +218,36 @@ void compress_line(int uncompressed_line){
   }
 
   //////// 4 bit bitmask compression //////////
-  
+  unsigned int BITMASK_SIZE = 4;
+  unsigned int bitmask = 0;      // for a correct bitmask atleast 1 bit should be '1'
+  for (int i=0;i<DICTIONARY_SIZE;i++){
+    unsigned int compared_line = uncompressed_line ^ dictionary[i];  // take the LSB 4 bits 
+    unsigned int mismatch_count = 0;
+    bool mismatch_found = 0;
+    unsigned int first_mismatch_index = 0;
+    for (int index=31;index>=0;index--){
+      if(compared_line & (1<<index)){    //check bit by bit for a mismatch
+        if(mismatch_found == 0){
+          first_mismatch_index = index;   // identify first mismatch index
+          mismatch_found = 1;
+        }
+        mismatch_count += 1;
+      }
+      if ((mismatch_count >4) || (mismatch_found && ((first_mismatch_index-index)>=BITMASK_SIZE))){
+        break;    // can not use 4 bit 
+      }
 
-  
+    }
+    if(mismatch_found){
+      unsigned int bitmask_end_index = first_mismatch_index-BITMASK_SIZE+1;
+      bitmask = (compared_line >> bitmask_end_index) & ((1 << BITMASK_SIZE)-1);
+      compressed = 1;
+      break;
+    }
+  }
 
 
-  
+   
 
   return;
 }
