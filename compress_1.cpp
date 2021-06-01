@@ -217,14 +217,32 @@ void compress_line(int uncompressed_line){
     return;
   }
 
-  //////// 4 bit bitmask compression //////////
-  unsigned int BITMASK_SIZE = 4;
-  unsigned int bitmask = 0;      // for a correct bitmask atleast 1 bit should be '1'
+   
+
+  return;
+}
+
+typedef struct bitmask_compression_t{
+  uint8_t bitmask_size;
+  bool compressed;
+  uint8_t first_mismatch_index;
+  uint8_t bitmask;
+}bitmask_compression_t;
+
+
+void bitmask_compression(unsigned int uncompressed_line, unsigned int dictionary[DICTIONARY_SIZE], 
+                        uint8_t DICTIONARY_SIZE, bitmask_compression_t *bcd){
+  
+  uint8_t bitmask_size = bcd->bitmask_size;
+  uint8_t bitmask = 0;      // for a correct bitmask atleast 1 bit should be '1'
+  bool compressed = 0;
+  uint8_t first_mismatch_index = 0;
   for (int i=0;i<DICTIONARY_SIZE;i++){
     unsigned int compared_line = uncompressed_line ^ dictionary[i];  // take the LSB 4 bits 
-    unsigned int mismatch_count = 0;
+    uint8_t mismatch_count = 0;
     bool mismatch_found = 0;
-    unsigned int first_mismatch_index = 0;
+    first_mismatch_index = 0;
+
     for (int index=31;index>=0;index--){
       if(compared_line & (1<<index)){    //check bit by bit for a mismatch
         if(mismatch_found == 0){
@@ -233,21 +251,22 @@ void compress_line(int uncompressed_line){
         }
         mismatch_count += 1;
       }
-      if ((mismatch_count >4) || (mismatch_found && ((first_mismatch_index-index)>=BITMASK_SIZE))){
-        break;    // can not use 4 bit 
+      if ((mismatch_count >4) || (mismatch_found && ((first_mismatch_index-index)>=bitmask_size))){
+        break;    // can not use n bit bitmask
       }
 
     }
     if(mismatch_found){
-      unsigned int bitmask_end_index = first_mismatch_index-BITMASK_SIZE+1;
-      bitmask = (compared_line >> bitmask_end_index) & ((1 << BITMASK_SIZE)-1);
+      unsigned int bitmask_end_index = first_mismatch_index-bitmask_size+1;
+      bitmask = (compared_line >> bitmask_end_index) & ((1 << bitmask_size)-1);
       compressed = 1;
       break;
     }
   }
-
-
-   
+  ////////// return the compression details
+  bcd->compressed = compressed;
+  bcd->bitmask = bitmask;
+  bcd->first_mismatch_index = first_mismatch_index;
 
   return;
 }
