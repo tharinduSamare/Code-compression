@@ -91,124 +91,6 @@ int create_dictionary(int original_size){
 }
 
 
-// int bit_mask_compression(int line){
-//   int compressed_line;
-//   for 
-
-
-//   return compressed_line;
-// } 
-
-void compress_line(int uncompressed_line){
-  int compressed_line = 0;
-  unsigned int compress_method = 0;
-  unsigned int dictionary_index = 0;
-  bool compressed = 0;
-
-  ////////// checking 1 bit mismatch ////////////////
-  unsigned int compared_val;
-  for (int i=0;i<DICTIONARY_SIZE;i++){
-    compared_val = uncompressed_line ^ dictionary[i];
-
-    unsigned int mismatch_index;
-
-    for (int index = 31;index >-1;index--){
-      if ((compared_val & 1) == 1){
-        compared_val = compared_val >>1;
-        if (compared_val == 0){
-          mismatch_index = index;
-          dictionary_index = i;
-          compressed = 1;
-          compress_method = 3; // '011' for 1 bit mismatch
-          break;
-        }
-        else{
-          break;   // more than 1 bit mismatch
-        }
-      }
-      else{
-        compared_val = compared_val >> 1;  // to check for next bit
-      }
-    }
-    if (compressed){
-      break;
-    }
-  }
-
-  if (compressed){
-    return;
-  }
-
-  //////// check 2 bit consecutive mismatches ///////////
-  for (int i=0;i<DICTIONARY_SIZE;i++){
-    compared_val = uncompressed_line ^ dictionary[i];
-
-    unsigned int mismatch_index;
-
-    for (int index = 30;index >-1;index--){
-      if ((compared_val & 3) == 1){
-        compared_val = compared_val >>2;
-        if (compared_val == 0){
-          mismatch_index = index;
-          dictionary_index = i;
-          compressed = 1;
-          compress_method = 4; // '100' for 2 bit consecutive mismatch
-          break;
-        }
-        else{
-          break;   // more than 1, consecutive 2 bit mismatch
-        }
-      }
-      else{
-        compared_val = compared_val >> 1;  // to check for next 2 bit
-      }
-    }
-    if (compressed){
-      break;
-    }
-  }
-
-  if (compressed){
-    return;
-  }
-
-  //////// check 4 consecutive bit mismatches ///////////
-  for (int i=0;i<DICTIONARY_SIZE;i++){
-    compared_val = uncompressed_line ^ dictionary[i];
-
-    unsigned int mismatch_index;
-
-    for (int index = 28;index >-1;index--){
-      if ((compared_val & 15) == 1){
-        compared_val = compared_val >>4;
-        if (compared_val == 0){
-          mismatch_index = index;
-          dictionary_index = i;
-          compressed = 1;
-          compress_method = 5; // '101' for 4 bit consecutive mismatch
-          break;
-        }
-        else{
-          break;   // more than 1, consecutive 2 bit mismatch
-        }
-      }
-      else{
-        compared_val = compared_val >> 1;  // to check for next 4 bit
-      }
-    }
-    if (compressed){
-      break;
-    }
-  }
-
-  if (compressed){
-    return;
-  }
-
-   
-
-  return;
-}
 
 typedef struct bitmask_compression_t{
   uint8_t bitmask_size;
@@ -224,6 +106,13 @@ typedef struct direct_matching_t{
 }direct_matching_t;
 
 
+typedef struct consecutive_bit_mismatch_t{
+  bool compressed;
+  uint8_t mismatch_size;
+  uint8_t dictionary_index;
+  uint8_t first_mismatch_index;
+}consecutive_bit_mismatch_t;
+
 void bitmask_compression(unsigned int uncompressed_line, unsigned int dictionary[DICTIONARY_SIZE], 
                         uint8_t DICTIONARY_SIZE, bitmask_compression_t *bcd){
   
@@ -233,13 +122,13 @@ void bitmask_compression(unsigned int uncompressed_line, unsigned int dictionary
   uint8_t dictionary_index = 0;
   uint8_t first_mismatch_index = 0;
   for (uint8_t i=0;i<DICTIONARY_SIZE;i++){
-    unsigned int compared_line = uncompressed_line ^ dictionary[i];  // take the LSB 4 bits 
+    unsigned int compared_line = uncompressed_line ^ dictionary[i];  // find mismatches
     uint8_t mismatch_count = 0;
     bool mismatch_found = 0;
     first_mismatch_index = 0;
 
-    for (int index=31;index>=0;index--){
-      if(compared_line & (1<<index)){    //check bit by bit for a mismatch
+    for (int index=31;index>=bitmask_size-1;index--){
+      if(compared_line & (1<<(index-1))){    //check bit by bit for a mismatch
         if(mismatch_found == 0){
           first_mismatch_index = index;   // identify first mismatch index
           mismatch_found = 1;
@@ -252,7 +141,7 @@ void bitmask_compression(unsigned int uncompressed_line, unsigned int dictionary
     }
     ////// when bitmask compression applicable //////////
     if(mismatch_found){
-      unsigned int bitmask_end_index = first_mismatch_index-bitmask_size+1;
+      uint8_t bitmask_end_index = first_mismatch_index-bitmask_size+1;
       bitmask = (compared_line >> bitmask_end_index) & ((1 << bitmask_size)-1);
       compressed = 1;
       dictionary_index = i; // get the dictionary index of correct dictionary word
@@ -284,4 +173,37 @@ void direct_matching(unsigned int uncompressed_line, unsigned int dictionary[DIC
   dm->compressed = compressed;
   dm->dictionary_index = dictionary_index;
   return ;
+}
+
+void consecutive_bit_mismatch(unsigned int uncompressed_line, unsigned int dictionary[DICTIONARY_SIZE], 
+                        uint8_t DICTIONARY_SIZE, consecutive_bit_mismatch_t *cbm){
+  
+  uint8_t mask_size = cbm->mismatch_size;
+  bool compressed = 0;
+  uint8_t dictionary_index = 0;
+  uint8_t first_mismatch_index = 0;
+  unsigned int mask = 0;
+
+  for(uint8_t i=0;i<DICTIONARY_SIZE;i++){
+    unsigned int compared_line = uncompressed_line ^ dictionary[i];  // find mismatches
+    for (uint8_t index=31;index>=mask_size-1;index--){
+      uint8_t mask_end_index = index-mask_size+1;
+      mask = ((1<<mask_size)-1)<<(index-mask_size);        // make lsb bits 1s and shift left
+      if (compared_line ^ mask == 0){
+        compressed = 1;
+        dictionary_index = i;
+        first_mismatch_index = index;
+        break;
+      }
+    }
+    if (compressed){
+      break;
+    }
+  }
+  ////// update structure values //////
+  cbm->compressed = compressed;
+  cbm->dictionary_index = dictionary_index;
+  cbm->first_mismatch_index = first_mismatch_index;
+
+  return;
 }
