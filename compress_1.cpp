@@ -113,7 +113,14 @@ typedef struct consecutive_bit_mismatch_t{
   uint8_t first_mismatch_index;
 }consecutive_bit_mismatch_t;
 
-void bitmask_compression(unsigned int uncompressed_line, unsigned int dictionary[DICTIONARY_SIZE], 
+typedef struct nonconsec_2bit_mismatch_t{
+  bool compressed;
+  uint8_t dictionary_index;
+  uint8_t first_mismatch_index;
+  uint8_t second_mismatch_index;
+} nonconsec_2bit_mismatch_t;
+
+bool bitmask_compression(unsigned int uncompressed_line, unsigned int dictionary[DICTIONARY_SIZE], 
                         uint8_t DICTIONARY_SIZE, bitmask_compression_t *bcd){
   
   uint8_t bitmask_size = bcd->bitmask_size;
@@ -154,10 +161,10 @@ void bitmask_compression(unsigned int uncompressed_line, unsigned int dictionary
   bcd->first_mismatch_index = first_mismatch_index;
   bcd->dictionary_index = dictionary_index;
 
-  return;
+  return compressed;
 }
 
-void direct_matching(unsigned int uncompressed_line, unsigned int dictionary[DICTIONARY_SIZE], 
+bool direct_matching(unsigned int uncompressed_line, unsigned int dictionary[DICTIONARY_SIZE], 
                      uint8_t DICTIONARY_SIZE, direct_matching_t *dm){
   
   uint8_t dictionary_index = 0;
@@ -172,10 +179,10 @@ void direct_matching(unsigned int uncompressed_line, unsigned int dictionary[DIC
   ////// set values in structure ///
   dm->compressed = compressed;
   dm->dictionary_index = dictionary_index;
-  return ;
+  return compressed;
 }
 
-void consecutive_bit_mismatch(unsigned int uncompressed_line, unsigned int dictionary[DICTIONARY_SIZE], 
+bool consecutive_bit_mismatch(unsigned int uncompressed_line, unsigned int dictionary[DICTIONARY_SIZE], 
                         uint8_t DICTIONARY_SIZE, consecutive_bit_mismatch_t *cbm){
   
   uint8_t mask_size = cbm->mismatch_size;
@@ -189,7 +196,7 @@ void consecutive_bit_mismatch(unsigned int uncompressed_line, unsigned int dicti
     for (uint8_t index=31;index>=mask_size-1;index--){
       uint8_t mask_end_index = index-mask_size+1;
       mask = ((1<<mask_size)-1)<<(index-mask_size);        // make lsb bits 1s and shift left
-      if (compared_line ^ mask == 0){
+      if (compared_line == mask){
         compressed = 1;
         dictionary_index = i;
         first_mismatch_index = index;
@@ -205,5 +212,76 @@ void consecutive_bit_mismatch(unsigned int uncompressed_line, unsigned int dicti
   cbm->dictionary_index = dictionary_index;
   cbm->first_mismatch_index = first_mismatch_index;
 
-  return;
+  return compressed;
+}
+
+bool nonconsec_2bit_mismatch (unsigned int uncompressed_line, unsigned int dictionary[DICTIONARY_SIZE], 
+                              uint8_t DICTIONARY_SIZE, nonconsec_2bit_mismatch_t *n2bm){
+  
+  bool compressed = 0;
+  uint8_t dictionary_index = 0;
+  uint8_t first_mismatch_index = 0;
+  uint8_t second_mismatch_index = 0;
+  unsigned int mask;
+
+  for (uint8_t i=0; i<DICTIONARY_SIZE;i++){
+    unsigned int compared_line = uncompressed_line ^ dictionary[i];  // find mismatches
+    for (uint8_t j=0;j<=30;j++){
+      for (uint8_t k=j+1;k<=31;k++){
+        mask = (1<<(j)) | (1<<(k));
+        if (compared_line == mask){
+          compressed = 1;
+          dictionary_index = i;
+          first_mismatch_index = k;   // left side mismatch
+          second_mismatch_index = j;  // right side mismatch
+          break;
+        }
+      }
+      if (compressed){
+        break;
+      }
+    }
+    if (compressed){
+      break;
+    }
+  }
+
+  ////// update struct values ////
+  n2bm->compressed = compressed;
+  n2bm->dictionary_index = dictionary_index;
+  n2bm->first_mismatch_index = first_mismatch_index;
+  n2bm-> second_mismatch_index = second_mismatch_index;
+
+  return compressed;
+}
+
+bool RLE_compression(unsigned int index, unsigned int uncompressed_data[], uint8_t *repeat_count){
+  bool compressed = 0;
+  if (index == 0){
+    compressed = 0;
+    return compressed;
+  }
+  if (index>1){
+    if (uncompressed_data[index-1] == uncompressed_data[index-2]){
+      compressed = 0;
+      return compressed;
+    }
+  }
+  if (uncompressed_data[index] != uncompressed_data[index-1]){
+    compressed = 0;
+    return compressed;
+  }
+  
+  *repeat_count = 0;
+  unsigned int value = uncompressed_data[index];
+  for (uint8_t i = 1;i<=8;i++){
+    if (dictionary[index+i] == value){
+      *repeat_count ++;
+    }
+    else{           
+      break;
+    }
+  }
+  compressed = 1;
+  return compressed;
 }
