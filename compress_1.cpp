@@ -104,18 +104,6 @@ void compress_line(int uncompressed_line){
   unsigned int compress_method = 0;
   unsigned int dictionary_index = 0;
   bool compressed = 0;
-  ///////////////// checking direct matching ///////////////
-  for (int i=0;i<DICTIONARY_SIZE;i++){
-    if (uncompressed_line == dictionary[i]){
-      compressed_line = dictionary[i];
-      compress_method = 7;     // '111' for direct match
-      compressed = 1;
-      break;
-    }
-  }
-  if (compressed){
-    return;
-  }
 
   ////////// checking 1 bit mismatch ////////////////
   unsigned int compared_val;
@@ -227,7 +215,13 @@ typedef struct bitmask_compression_t{
   bool compressed;
   uint8_t first_mismatch_index;
   uint8_t bitmask;
+  uint8_t dictionary_index;
 }bitmask_compression_t;
+
+typedef struct direct_matching_t{
+  bool compressed;
+  uint8_t dictionary_index;
+}direct_matching_t;
 
 
 void bitmask_compression(unsigned int uncompressed_line, unsigned int dictionary[DICTIONARY_SIZE], 
@@ -236,8 +230,9 @@ void bitmask_compression(unsigned int uncompressed_line, unsigned int dictionary
   uint8_t bitmask_size = bcd->bitmask_size;
   uint8_t bitmask = 0;      // for a correct bitmask atleast 1 bit should be '1'
   bool compressed = 0;
+  uint8_t dictionary_index = 0;
   uint8_t first_mismatch_index = 0;
-  for (int i=0;i<DICTIONARY_SIZE;i++){
+  for (uint8_t i=0;i<DICTIONARY_SIZE;i++){
     unsigned int compared_line = uncompressed_line ^ dictionary[i];  // take the LSB 4 bits 
     uint8_t mismatch_count = 0;
     bool mismatch_found = 0;
@@ -254,12 +249,13 @@ void bitmask_compression(unsigned int uncompressed_line, unsigned int dictionary
       if ((mismatch_count >4) || (mismatch_found && ((first_mismatch_index-index)>=bitmask_size))){
         break;    // can not use n bit bitmask
       }
-
     }
+    ////// when bitmask compression applicable //////////
     if(mismatch_found){
       unsigned int bitmask_end_index = first_mismatch_index-bitmask_size+1;
       bitmask = (compared_line >> bitmask_end_index) & ((1 << bitmask_size)-1);
       compressed = 1;
+      dictionary_index = i; // get the dictionary index of correct dictionary word
       break;
     }
   }
@@ -267,6 +263,25 @@ void bitmask_compression(unsigned int uncompressed_line, unsigned int dictionary
   bcd->compressed = compressed;
   bcd->bitmask = bitmask;
   bcd->first_mismatch_index = first_mismatch_index;
+  bcd->dictionary_index = dictionary_index;
 
   return;
+}
+
+void direct_matching(unsigned int uncompressed_line, unsigned int dictionary[DICTIONARY_SIZE], 
+                     uint8_t DICTIONARY_SIZE, direct_matching_t *dm){
+  
+  uint8_t dictionary_index = 0;
+  bool compressed = 0;
+  for (uint8_t i=0;i<DICTIONARY_SIZE;i++){
+    if (uncompressed_line == dictionary[i]){
+      compressed = 1;
+      dictionary_index = i;
+      break;
+    }
+  }
+  ////// set values in structure ///
+  dm->compressed = compressed;
+  dm->dictionary_index = dictionary_index;
+  return ;
 }
