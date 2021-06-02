@@ -2,95 +2,11 @@
 #include <fstream>
 #include <string>
 #include <math.h>
+#include <bitset>
 using namespace std;
 
 const int DICTIONARY_SIZE = 16;
-const int MAX_SIZE = 1024;
-static unsigned int original_data[MAX_SIZE];
-static unsigned int dictionary[16];
-
-
-int Read_original();
-int create_dictionary(int original_size);
-int string_to_int(string word);
-
-int main(){
-  int original_size;
-  original_size = Read_original();
-  cout << original_size << endl;
-  create_dictionary(original_size);
-  for (int i=0;i<16; i++){
-    cout << dictionary[i] <<endl;
-  }
-
-  // cout << string_to_int("11011111101011111111111011101111");
-  return 0;
-}
-
-
-int Read_original(){
-  string uncompressed_line;
-  ifstream original_file("original.txt");
-
-  int i = 0;
-  while (getline (original_file, uncompressed_line)) {
-    original_data[i] = (unsigned int )string_to_int(uncompressed_line);
-    i++;
-  }
-  original_file.close();
-      
-  return i;
-}
-
-int string_to_int(string word){
-  int value = 0;
-  for (int i=0;i<32;i++){
-    value += stoi(word.substr(i,1))*(int)pow(2.0,i);
-  }
-  return value;
-}
-
-int create_dictionary(int original_size){
-  int seen[original_size] = {0};
-  int unique_count=0;
-  int unique_values[original_size];
-  int repeat_counts[original_size];
-
-  /////////////identify the unique values and their counts/////////////
-  for (int i=1;i<original_size;i++){
-    if (seen[i] == 0){
-      int count=0;
-      for (int j=i; j<original_size; j++){
-        if (original_data[i] == original_data[j]){
-          count++;
-          seen[j] = 1;
-        }
-      }
-      repeat_counts[unique_count] = count;
-      unique_values[unique_count] = original_data[i];
-      unique_count ++;
-    }    
-  }
-  //////////// create dictionary from unique values ////////////
-  for (int i=0;i<DICTIONARY_SIZE;i++){
-
-    int max_count = repeat_counts[0];
-    int max_index = 0;
-    
-    for (int j=0; j<unique_count;j++){
-      if (max_count < repeat_counts[j]){
-        max_count = repeat_counts[j];
-        max_index = j;
-      }
-    }
-
-    repeat_counts[max_index] = -1;  // remove the current max value
-    dictionary[i] = unique_values[max_index];
-  }
-  return 0;
-}
-
-
+static unsigned int dictionary[DICTIONARY_SIZE];
 
 typedef struct bitmask_compression_t{
   uint8_t bitmask_size;
@@ -120,8 +36,119 @@ typedef struct nonconsec_2bit_mismatch_t{
   uint8_t second_mismatch_index;
 } nonconsec_2bit_mismatch_t;
 
-bool bitmask_compression(unsigned int uncompressed_line, unsigned int dictionary[DICTIONARY_SIZE], 
-                        uint8_t DICTIONARY_SIZE, bitmask_compression_t *bcd){
+unsigned int* Read_original(unsigned int *size);
+void create_dictionary(unsigned int original_size, unsigned int original_data[]);
+int string_to_int(string word);
+
+bool bitmask_compression(unsigned int uncompressed_line, bitmask_compression_t *bcd);
+
+bool direct_matching(unsigned int uncompressed_line, direct_matching_t *dm);
+
+bool consecutive_bit_mismatch(unsigned int uncompressed_line, consecutive_bit_mismatch_t *cbm);
+
+bool nonconsec_2bit_mismatch (unsigned int uncompressed_line, nonconsec_2bit_mismatch_t *n2bm);
+
+bool RLE_compression(unsigned int index, unsigned int uncompressed_data[], uint8_t *repeat_count);
+
+
+int main(){
+  unsigned int original_size = 0; // size of the uncompressed dataset
+  ///////// get original data /////
+  unsigned int* dyn_arr = Read_original(&original_size);
+  unsigned int original_data[original_size];
+
+  for (int i=0;i<original_size;i++){
+    original_data[i] = dyn_arr[i];
+  }
+  delete[] dyn_arr;
+
+  /////// create the dictionary ///////
+  ofstream dictionary_file("dictionary.txt");
+  create_dictionary(original_size, original_data);
+  if (dictionary_file.is_open()){
+    for (int i=0;i<16; i++){
+      dictionary_file << dictionary[i] << endl;
+    }
+  }
+
+  bitmask_compression_t bcd;
+  bcd.bitmask_size = 4;
+
+  bool compressed = bitmask_compression(dictionary[0], &bcd);
+
+
+
+  return 0;
+}
+
+
+unsigned int* Read_original(unsigned int *size){
+  string uncompressed_line;
+  ifstream original_file("original.txt");
+  //////// find the size of original dataset ///
+  while(getline(original_file,uncompressed_line)){
+    *size = *size + 1;
+  }
+
+  unsigned int * original_data = new unsigned int [*size];
+  unsigned int index = 0;
+  while (getline (original_file, uncompressed_line)) {
+    original_data[index] = (unsigned int )string_to_int(uncompressed_line);
+    index++;
+  }
+  original_file.close();
+  return original_data;  
+}
+
+int string_to_int(string word){
+  int value = 0;
+  for (int i=0;i<32;i++){
+    value += stoi(word.substr(i,1))*(int)pow(2.0,i);
+  }
+  return value;
+}
+
+void create_dictionary(unsigned int original_size, unsigned int original_data[]){
+  int seen[original_size] = {0};
+  int unique_count=0;
+  int unique_values[original_size];
+  int repeat_counts[original_size];
+
+  /////////////identify the unique values and their counts/////////////
+  for (unsigned int i=1;i<original_size;i++){
+    if (seen[i] == 0){
+      unsigned int count=0;
+      for (unsigned int j=i; j<original_size; j++){
+        if (original_data[i] == original_data[j]){
+          count++;
+          seen[j] = 1;
+        }
+      }
+      repeat_counts[unique_count] = count;
+      unique_values[unique_count] = original_data[i];
+      unique_count ++;
+    }    
+  }
+  //////////// create dictionary from unique values ////////////
+  for (int i=0;i<DICTIONARY_SIZE;i++){
+
+    int max_count = repeat_counts[0];
+    int max_index = 0;
+    
+    for (int j=0; j<unique_count;j++){
+      if (max_count < repeat_counts[j]){
+        max_count = repeat_counts[j];
+        max_index = j;
+      }
+    }
+
+    repeat_counts[max_index] = -1;  // remove the current max value
+    dictionary[i] = unique_values[max_index];
+  }
+  return;
+}
+
+bool bitmask_compression(unsigned int uncompressed_line, bitmask_compression_t *bcd){
   
   uint8_t bitmask_size = bcd->bitmask_size;
   uint8_t bitmask = 0;      // for a correct bitmask atleast 1 bit should be '1'
@@ -155,6 +182,13 @@ bool bitmask_compression(unsigned int uncompressed_line, unsigned int dictionary
       break;
     }
   }
+  std::cout << "uncompressed line: " << std::bitset<32>(uncompressed_line) << endl;
+  std::cout << "dictionary line: " << std::bitset<32>(dictionary[dictionary_index]) << endl;
+  cout << "compressed " << compressed << endl;
+  cout << "bitmask " << unsigned(bitmask) << endl;
+  cout << "first_mismatch_index " << unsigned(first_mismatch_index) << endl;
+  cout << "dictionary_index " << unsigned(dictionary_index) << endl;
+
   ////////// return the compression details
   bcd->compressed = compressed;
   bcd->bitmask = bitmask;
@@ -164,8 +198,7 @@ bool bitmask_compression(unsigned int uncompressed_line, unsigned int dictionary
   return compressed;
 }
 
-bool direct_matching(unsigned int uncompressed_line, unsigned int dictionary[DICTIONARY_SIZE], 
-                     uint8_t DICTIONARY_SIZE, direct_matching_t *dm){
+bool direct_matching(unsigned int uncompressed_line, direct_matching_t *dm){
   
   uint8_t dictionary_index = 0;
   bool compressed = 0;
@@ -182,8 +215,7 @@ bool direct_matching(unsigned int uncompressed_line, unsigned int dictionary[DIC
   return compressed;
 }
 
-bool consecutive_bit_mismatch(unsigned int uncompressed_line, unsigned int dictionary[DICTIONARY_SIZE], 
-                        uint8_t DICTIONARY_SIZE, consecutive_bit_mismatch_t *cbm){
+bool consecutive_bit_mismatch(unsigned int uncompressed_line, consecutive_bit_mismatch_t *cbm){
   
   uint8_t mask_size = cbm->mismatch_size;
   bool compressed = 0;
@@ -215,8 +247,7 @@ bool consecutive_bit_mismatch(unsigned int uncompressed_line, unsigned int dicti
   return compressed;
 }
 
-bool nonconsec_2bit_mismatch (unsigned int uncompressed_line, unsigned int dictionary[DICTIONARY_SIZE], 
-                              uint8_t DICTIONARY_SIZE, nonconsec_2bit_mismatch_t *n2bm){
+bool nonconsec_2bit_mismatch (unsigned int uncompressed_line, nonconsec_2bit_mismatch_t *n2bm){
   
   bool compressed = 0;
   uint8_t dictionary_index = 0;
@@ -262,8 +293,8 @@ bool RLE_compression(unsigned int index, unsigned int uncompressed_data[], uint8
     return compressed;
   }
   if (index>1){
-    if (uncompressed_data[index-1] == uncompressed_data[index-2]){
-      compressed = 0;
+    if (uncompressed_data[index-1] == uncompressed_data[index-2]){    
+      compressed = 0;            // if the previous one is RLF compressed don't rle compress
       return compressed;
     }
   }
