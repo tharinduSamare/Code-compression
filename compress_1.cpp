@@ -55,12 +55,15 @@ int main(){
   unsigned int original_size = 0; // size of the uncompressed dataset
   ///////// get original data /////
   unsigned int* dyn_arr = Read_original(&original_size);
-  unsigned int original_data[original_size];
+  unsigned int original_data[original_size] = {0};
 
+ 
   for (int i=0;i<original_size;i++){
     original_data[i] = dyn_arr[i];
   }
   delete[] dyn_arr;
+  
+  
 
   /////// create the dictionary ///////
   ofstream dictionary_file("dictionary.txt");
@@ -70,13 +73,32 @@ int main(){
       dictionary_file << dictionary[i] << endl;
     }
   }
+  dictionary_file.close();
+  
 
   bitmask_compression_t bcd;
   bcd.bitmask_size = 4;
 
-  bool compressed = bitmask_compression(dictionary[0], &bcd);
-
-
+  
+  for (int i=0; i< original_size;i++){
+    unsigned int uncompressed_line = original_data[i];
+    bool compressed = bitmask_compression(uncompressed_line, &bcd);
+    std::cout << "compared line: " << std::bitset<32>(uncompressed_line ^ dictionary[bcd.dictionary_index]) << endl;
+    if (compressed == 1){      
+      std::cout << "uncompressed line: " << std::bitset<32>(uncompressed_line) << endl;
+      std::cout << "dictionary line: " << std::bitset<32>(dictionary[bcd.dictionary_index]) << endl;
+      cout << "compressed " << compressed << endl;
+      cout << "bitmask " << unsigned(bcd.bitmask) << endl;
+      cout << "first_mismatch_index " << unsigned(bcd.first_mismatch_index) << endl;
+      cout << "dictionary_index " << unsigned(bcd.dictionary_index) << endl;
+    }
+    else{
+      cout << "can not compress" << endl;
+    }
+    cout << endl;
+  }
+  
+  
 
   return 0;
 }
@@ -89,12 +111,15 @@ unsigned int* Read_original(unsigned int *size){
   while(getline(original_file,uncompressed_line)){
     *size = *size + 1;
   }
+  original_file.close();
 
-  unsigned int * original_data = new unsigned int [*size];
+  unsigned int * original_data = new unsigned int [*size]();
   unsigned int index = 0;
+
+  original_file.open("original.txt");
   while (getline (original_file, uncompressed_line)) {
     original_data[index] = (unsigned int )string_to_int(uncompressed_line);
-    index++;
+    index++;   
   }
   original_file.close();
   return original_data;  
@@ -103,7 +128,7 @@ unsigned int* Read_original(unsigned int *size){
 int string_to_int(string word){
   int value = 0;
   for (int i=0;i<32;i++){
-    value += stoi(word.substr(i,1))*(int)pow(2.0,i);
+    value += stoi(word.substr(i,1))*(int)pow(2.0,(31-i));
   }
   return value;
 }
@@ -155,39 +180,42 @@ bool bitmask_compression(unsigned int uncompressed_line, bitmask_compression_t *
   bool compressed = 0;
   uint8_t dictionary_index = 0;
   uint8_t first_mismatch_index = 0;
+  uint8_t last_mismatch_index = 0;
+
   for (uint8_t i=0;i<DICTIONARY_SIZE;i++){
     unsigned int compared_line = uncompressed_line ^ dictionary[i];  // find mismatches
     uint8_t mismatch_count = 0;
     bool mismatch_found = 0;
     first_mismatch_index = 0;
 
-    for (int index=31;index>=bitmask_size-1;index--){
-      if(compared_line & (1<<(index-1))){    //check bit by bit for a mismatch
+    for (int index=31;index>=0;index--){
+      if(compared_line & (1<<index)){    //check bit by bit for a mismatch
         if(mismatch_found == 0){
           first_mismatch_index = index;   // identify first mismatch index
           mismatch_found = 1;
         }
+        last_mismatch_index = index;
         mismatch_count += 1;
       }
-      if ((mismatch_count >4) || (mismatch_found && ((first_mismatch_index-index)>=bitmask_size))){
-        break;    // can not use n bit bitmask
-      }
     }
-    ////// when bitmask compression applicable //////////
-    if(mismatch_found){
+    if (mismatch_found && (mismatch_count <= bitmask_size) && (first_mismatch_index-last_mismatch_index < bitmask_size)){
       uint8_t bitmask_end_index = first_mismatch_index-bitmask_size+1;
+      if (first_mismatch_index < bitmask_size-1){ // when first bits of mask are 0s 
+        bitmask_end_index = 0;
+      }
       bitmask = (compared_line >> bitmask_end_index) & ((1 << bitmask_size)-1);
       compressed = 1;
       dictionary_index = i; // get the dictionary index of correct dictionary word
       break;
     }
   }
-  std::cout << "uncompressed line: " << std::bitset<32>(uncompressed_line) << endl;
-  std::cout << "dictionary line: " << std::bitset<32>(dictionary[dictionary_index]) << endl;
-  cout << "compressed " << compressed << endl;
-  cout << "bitmask " << unsigned(bitmask) << endl;
-  cout << "first_mismatch_index " << unsigned(first_mismatch_index) << endl;
-  cout << "dictionary_index " << unsigned(dictionary_index) << endl;
+  // std::cout << "compared line: " << std::bitset<32>(uncompressed_line ^ dictionary[dictionary_index]) << endl;
+  // std::cout << "uncompressed line: " << std::bitset<32>(uncompressed_line) << endl;
+  // std::cout << "dictionary line: " << std::bitset<32>(dictionary[dictionary_index]) << endl;
+  // cout << "compressed " << compressed << endl;
+  // cout << "bitmask " << unsigned(bitmask) << endl;
+  // cout << "first_mismatch_index " << unsigned(first_mismatch_index) << endl;
+  // cout << "dictionary_index " << unsigned(dictionary_index) << endl;
 
   ////////// return the compression details
   bcd->compressed = compressed;
