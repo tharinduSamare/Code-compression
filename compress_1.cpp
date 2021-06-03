@@ -95,7 +95,7 @@ int main(){
     else{
       cout << "can not compress" << endl;
     }
-    cout << "adsf" << endl;
+    cout <<  endl;
   }
   
   
