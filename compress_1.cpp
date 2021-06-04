@@ -43,7 +43,7 @@ bool consecutive_bit_mismatch(unsigned int uncompressed_line, consecutive_bit_mi
 
 bool nonconsec_2bit_mismatch (unsigned int uncompressed_line, nonconsec_2bit_mismatch_t *n2bm);
 
-bool RLE_compression(unsigned int index, unsigned int uncompressed_data[], unsigned int array_size, unsigned int *repeat_count);
+bool RLE_compression(unsigned int index, unsigned int uncompressed_data[], unsigned int array_size, uint8_t *repeat_count);
 
 int main(){
   unsigned int original_size = 0; // size of the uncompressed dataset
@@ -66,6 +66,21 @@ int main(){
     }
   }
   dictionary_file.close();
+
+  uint8_t repeat_count = 0;
+  unsigned int index = 0;
+  while (index < original_size){
+    bool compressed = RLE_compression(index,original_data, original_size, &repeat_count);
+    if (compressed){
+      cout << "index " << index << endl;
+      cout << "repeat count " << unsigned(repeat_count) << endl;
+      index = index + repeat_count;
+    }
+    else{
+      cout << "can not do" << endl;
+      index ++;
+    }
+  }
 
   return 0;
 }
@@ -308,11 +323,11 @@ bool RLE_compression(unsigned int index, unsigned int uncompressed_data[], unsig
   
   *repeat_count = 0;
   unsigned int value = uncompressed_data[index-1];  // the value before current index
-  for (uint8_t i = index;i<RLE_MAX_SIZE;i++){
-    if (i>= array_size){
+  for (uint8_t i = 0;i<RLE_MAX_SIZE;i++){
+    if (index + i >= array_size){
       break;
     }
-    else if (uncompressed_data[i] == value){
+    else if (uncompressed_data[index + i] == value){
       *repeat_count = *repeat_count + 1;
     }
     else{           
