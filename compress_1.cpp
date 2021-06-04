@@ -83,7 +83,6 @@ int main(){
       break;
     }
   }
-  cout <<"asdf";
 
   return 0;
 }
