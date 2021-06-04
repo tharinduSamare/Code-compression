@@ -7,6 +7,7 @@ using namespace std;
 
 const int DICTIONARY_SIZE = 16;
 static unsigned int dictionary[DICTIONARY_SIZE];
+static uint8_t RLE_MAX_SIZE = 8;
 
 typedef struct bitmask_compression_t{
   uint8_t bitmask_size;
@@ -34,7 +35,7 @@ unsigned int* Read_original(unsigned int *size);
 void create_dictionary(unsigned int original_size, unsigned int original_data[]);
 int string_to_int(string word);
 
-bool bitmask_compression(unsigned int uncompressed_line, bitmask_compression_t *bcd);
+bool bitmask_compression(unsigned int uncompressed_line, bitmask_compression_t *bc);
 
 bool direct_matching(unsigned int uncompressed_line, uint8_t *dictionary_index);
 
@@ -42,7 +43,7 @@ bool consecutive_bit_mismatch(unsigned int uncompressed_line, consecutive_bit_mi
 
 bool nonconsec_2bit_mismatch (unsigned int uncompressed_line, nonconsec_2bit_mismatch_t *n2bm);
 
-bool RLE_compression(unsigned int index, unsigned int uncompressed_data[], unsigned int array_size, uint8_t *repeat_count);
+bool RLE_compression(unsigned int index, unsigned int uncompressed_data[], unsigned int array_size, unsigned int *repeat_count);
 
 int main(){
   unsigned int original_size = 0; // size of the uncompressed dataset
@@ -65,24 +66,6 @@ int main(){
     }
   }
   dictionary_file.close();
-
-  uint8_t repeat_count = 0;
-  unsigned int index = 0;
-  while (1){
-    bool compressed = RLE_compression(index,original_data, original_size, &repeat_count);
-    if (compressed){
-      cout << "index " << index << endl;
-      cout << "repeat count " << unsigned(repeat_count) << endl;
-      index = index + repeat_count+1;
-    }
-    else{
-      cout << "can not do" << endl;
-      index ++;
-    }
-    if (index >= original_size){
-      break;
-    }
-  }
 
   return 0;
 }
@@ -116,6 +99,14 @@ int string_to_int(string word){
   }
   return value;
 }
+
+string number_to_string(uint8_t value){
+  string str;
+
+
+  return str;
+}
+
 
 void create_dictionary(unsigned int original_size, unsigned int original_data[]){
   int seen[original_size] = {0};
@@ -157,9 +148,9 @@ void create_dictionary(unsigned int original_size, unsigned int original_data[])
   return;
 }
 
-bool bitmask_compression(unsigned int uncompressed_line, bitmask_compression_t *bcd){
+bool bitmask_compression(unsigned int uncompressed_line, bitmask_compression_t *bc){
   
-  uint8_t bitmask_size = bcd->bitmask_size;
+  uint8_t bitmask_size = bc->bitmask_size;
   uint8_t bitmask = 0;      // for a correct bitmask atleast 1 bit should be '1'
   bool compressed = 0;
   uint8_t dictionary_index = 0;
@@ -202,10 +193,10 @@ bool bitmask_compression(unsigned int uncompressed_line, bitmask_compression_t *
   // cout << "dictionary_index " << unsigned(dictionary_index) << endl;
 
   ////////// return the compression details
-  bcd->compressed = compressed;
-  bcd->bitmask = bitmask;
-  bcd->first_mismatch_index = first_mismatch_index;
-  bcd->dictionary_index = dictionary_index;
+  bc->compressed = compressed;
+  bc->bitmask = bitmask;
+  bc->first_mismatch_index = first_mismatch_index;
+  bc->dictionary_index = dictionary_index;
 
   return compressed;
 }
@@ -309,12 +300,7 @@ bool RLE_compression(unsigned int index, unsigned int uncompressed_data[], unsig
     compressed = 0;
     return compressed;
   }
-  if (index>1){
-    if (uncompressed_data[index-1] == uncompressed_data[index-2]){    
-      compressed = 0;            // if the previous one is RLF compressed don't rle compress
-      return compressed;
-    }
-  }
+
   if (uncompressed_data[index] != uncompressed_data[index-1]){
     compressed = 0;
     return compressed;
@@ -322,8 +308,11 @@ bool RLE_compression(unsigned int index, unsigned int uncompressed_data[], unsig
   
   *repeat_count = 0;
   unsigned int value = uncompressed_data[index-1];  // the value before current index
-  for (unsigned int i = index;i<array_size;i++){
-    if (uncompressed_data[i] == value){
+  for (uint8_t i = index;i<RLE_MAX_SIZE;i++){
+    if (i>= array_size){
+      break;
+    }
+    else if (uncompressed_data[i] == value){
       *repeat_count = *repeat_count + 1;
     }
     else{           
@@ -333,3 +322,53 @@ bool RLE_compression(unsigned int index, unsigned int uncompressed_data[], unsig
   compressed = 1;
   return compressed;
 }
+
+// bool compression (unsigned int uncompressed_data[], unsigned int uncompressed_array_size){
+
+
+//   ///////////  create initial details of each compression type //////////
+//   // bitmask compression 
+//   bitmask_compression_t bc;
+//   bc.bitmask_size = 4;
+//     // direct match 
+//   uint8_t dictioanry_index;
+//   // consecutive 1,2,4 bit mismatch compression
+//   consecutive_bit_mismatch_t cbm_1, cbm_2, cbm_4;
+//   cbm_1.mismatch_size = 1;
+//   cbm_2.mismatch_size = 2;
+//   cbm_4.mismatch_size = 4;
+//   // anywhere 2 bit mismatch compression
+//   nonconsec_2bit_mismatch_t n2bm;
+//   // RLE compression
+//   unsigned int repeat_count;
+
+//   ofstream compressed_file("cout.txt");
+
+//   unsigned int index = 0;
+//   bool compressed = 0;
+
+//   while (index < uncompressed_array_size){
+//     compressed = 0;
+
+//     compressed = RLE_compression(index, uncompressed_data, uncompressed_array_size, &repeat_count);
+//     if (compressed){
+//       uint8_t temp1;
+//       while 
+//       compressed_file.open();
+//       compressed_file << "001" ;
+//       index += repeat_count;
+//       continue;
+//     }
+
+
+
+
+
+//   }
+
+
+
+
+
+
+// }
