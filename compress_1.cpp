@@ -16,12 +16,6 @@ typedef struct bitmask_compression_t{
   uint8_t dictionary_index;
 }bitmask_compression_t;
 
-typedef struct direct_matching_t{
-  bool compressed;
-  uint8_t dictionary_index;
-}direct_matching_t;
-
-
 typedef struct consecutive_bit_mismatch_t{
   bool compressed;
   uint8_t mismatch_size;
@@ -42,7 +36,7 @@ int string_to_int(string word);
 
 bool bitmask_compression(unsigned int uncompressed_line, bitmask_compression_t *bcd);
 
-bool direct_matching(unsigned int uncompressed_line, direct_matching_t *dm);
+bool direct_matching(unsigned int uncompressed_line, uint8_t *dictionary_index);
 
 bool consecutive_bit_mismatch(unsigned int uncompressed_line, consecutive_bit_mismatch_t *cbm);
 
@@ -63,8 +57,6 @@ int main(){
   }
   delete[] dyn_arr;
   
-  
-
   /////// create the dictionary ///////
   ofstream dictionary_file("dictionary.txt");
   create_dictionary(original_size, original_data);
@@ -74,31 +66,26 @@ int main(){
     }
   }
   dictionary_file.close();
-  
 
-  bitmask_compression_t bcd;
-  bcd.bitmask_size = 4;
+  consecutive_bit_mismatch_t cbm ;
+  cbm.mismatch_size = 4;
 
-  
-  for (int i=0; i< original_size;i++){
+  for (int i=0;i<original_size;i++){
     unsigned int uncompressed_line = original_data[i];
-    bool compressed = bitmask_compression(uncompressed_line, &bcd);
-    std::cout << "compared line: " << std::bitset<32>(uncompressed_line ^ dictionary[bcd.dictionary_index]) << endl;
-    if (compressed == 1){      
+    bool compressed =  consecutive_bit_mismatch(uncompressed_line,&cbm);
+    if (compressed){
+      std::cout << "compared line: " << std::bitset<32>(uncompressed_line ^ dictionary[cbm.dictionary_index]) << endl;
       std::cout << "uncompressed line: " << std::bitset<32>(uncompressed_line) << endl;
-      std::cout << "dictionary line: " << std::bitset<32>(dictionary[bcd.dictionary_index]) << endl;
-      cout << "compressed " << compressed << endl;
-      cout << "bitmask " << unsigned(bcd.bitmask) << endl;
-      cout << "first_mismatch_index " << unsigned(bcd.first_mismatch_index) << endl;
-      cout << "dictionary_index " << unsigned(bcd.dictionary_index) << endl;
+      std::cout << "dictionary line: " << std::bitset<32>(dictionary[cbm.dictionary_index]) << endl;
+      cout << "first_mismatch_index " << unsigned(cbm.first_mismatch_index) << endl;
+      cout << "dictionary_index " << unsigned(cbm.dictionary_index) << endl;
     }
     else{
-      cout << "can not compress" << endl;
+      std::cout << "compared line: " << std::bitset<32>(uncompressed_line ^ dictionary[cbm.dictionary_index]) << endl;
+      cout << "can not do" << endl;
     }
-    cout <<  endl;
+    cout << endl;
   }
-  
-  
 
   return 0;
 }
@@ -226,20 +213,17 @@ bool bitmask_compression(unsigned int uncompressed_line, bitmask_compression_t *
   return compressed;
 }
 
-bool direct_matching(unsigned int uncompressed_line, direct_matching_t *dm){
+bool direct_matching(unsigned int uncompressed_line, uint8_t *dictionary_index){
   
-  uint8_t dictionary_index = 0;
+  *dictionary_index = 0;
   bool compressed = 0;
   for (uint8_t i=0;i<DICTIONARY_SIZE;i++){
     if (uncompressed_line == dictionary[i]){
       compressed = 1;
-      dictionary_index = i;
+      *dictionary_index = i;   // return the index of matched dictionary value
       break;
     }
   }
-  ////// set values in structure ///
-  dm->compressed = compressed;
-  dm->dictionary_index = dictionary_index;
   return compressed;
 }
 
@@ -250,12 +234,13 @@ bool consecutive_bit_mismatch(unsigned int uncompressed_line, consecutive_bit_mi
   uint8_t dictionary_index = 0;
   uint8_t first_mismatch_index = 0;
   unsigned int mask = 0;
-
   for(uint8_t i=0;i<DICTIONARY_SIZE;i++){
+    
     unsigned int compared_line = uncompressed_line ^ dictionary[i];  // find mismatches
-    for (uint8_t index=31;index>=mask_size-1;index--){
-      uint8_t mask_end_index = index-mask_size+1;
-      mask = ((1<<mask_size)-1)<<(index-mask_size);        // make lsb bits 1s and shift left
+    // cout << "asdfas" << endl;
+    for (uint8_t index=mask_size-1;index<32;index++){
+      // cout << "index " << unsigned(index) << endl;
+      mask = ((1<<mask_size)-1)<<(index-mask_size+1);        // make lsb bits 1s and shift left
       if (compared_line == mask){
         compressed = 1;
         dictionary_index = i;
@@ -268,6 +253,13 @@ bool consecutive_bit_mismatch(unsigned int uncompressed_line, consecutive_bit_mi
     }
   }
   ////// update structure values //////
+  // std::cout << "compared line: " << std::bitset<32>(uncompressed_line ^ dictionary[dictionary_index]) << endl;
+  // std::cout << "uncompressed line: " << std::bitset<32>(uncompressed_line) << endl;
+  // std::cout << "dictionary line: " << std::bitset<32>(dictionary[dictionary_index]) << endl;
+  // cout << "compressed " << compressed << endl;
+  // cout << "first_mismatch_index " << unsigned(first_mismatch_index) << endl;
+  // cout << "dictionary_index " << unsigned(dictionary_index) << endl;
+
   cbm->compressed = compressed;
   cbm->dictionary_index = dictionary_index;
   cbm->first_mismatch_index = first_mismatch_index;
