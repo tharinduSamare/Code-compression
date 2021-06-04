@@ -3,6 +3,8 @@
 #include <string>
 #include <math.h>
 #include <bitset>
+#include <vector>
+#include <bits/stdc++.h>
 using namespace std;
 
 const int DICTIONARY_SIZE = 16;
@@ -35,15 +37,18 @@ unsigned int* Read_original(unsigned int *size);
 void create_dictionary(unsigned int original_size, unsigned int original_data[]);
 int string_to_int(string word);
 
+string uint8_to_string(uint8_t value, uint8_t bit_count);
+string uint_to_string(unsigned int value);
+
 bool bitmask_compression(unsigned int uncompressed_line, bitmask_compression_t *bc);
-
 bool direct_matching(unsigned int uncompressed_line, uint8_t *dictionary_index);
-
 bool consecutive_bit_mismatch(unsigned int uncompressed_line, consecutive_bit_mismatch_t *cbm);
-
 bool nonconsec_2bit_mismatch (unsigned int uncompressed_line, nonconsec_2bit_mismatch_t *n2bm);
-
 bool RLE_compression(unsigned int index, unsigned int uncompressed_data[], unsigned int array_size, uint8_t *repeat_count);
+
+vector<string> compression (unsigned int uncompressed_data[], unsigned int uncompressed_array_size);
+void create_compressed_file(vector<string> &compressed_data);
+
 
 int main(){
   unsigned int original_size = 0; // size of the uncompressed dataset
@@ -67,20 +72,11 @@ int main(){
   }
   dictionary_file.close();
 
-  uint8_t repeat_count = 0;
-  unsigned int index = 0;
-  while (index < original_size){
-    bool compressed = RLE_compression(index,original_data, original_size, &repeat_count);
-    if (compressed){
-      cout << "index " << index << endl;
-      cout << "repeat count " << unsigned(repeat_count) << endl;
-      index = index + repeat_count;
-    }
-    else{
-      cout << "can not do" << endl;
-      index ++;
-    }
-  }
+  vector<string> compressed_data;
+  compressed_data =  compression(original_data,original_size);
+
+  ///////// write compressed data & dictionary to a file ////////
+  create_compressed_file(compressed_data);
 
   return 0;
 }
@@ -115,13 +111,21 @@ int string_to_int(string word){
   return value;
 }
 
-string number_to_string(uint8_t value){
-  string str;
-
-
-  return str;
+string uint8_to_string(uint8_t value, uint8_t bit_count){
+  string string_val = "";
+  for (int8_t i=bit_count-1;i>=0; i--){
+    string_val += to_string((value & (1<<i))>>i) ;
+  }
+  return string_val;
 }
 
+string uint_to_string(unsigned int value){
+  string string_val = "";
+  for (int8_t i=31;i>0; i--){
+    string_val += to_string((value & (1<<i))>>i) ;
+  }
+  return string_val;
+}
 
 void create_dictionary(unsigned int original_size, unsigned int original_data[]){
   int seen[original_size] = {0};
@@ -210,7 +214,7 @@ bool bitmask_compression(unsigned int uncompressed_line, bitmask_compression_t *
   ////////// return the compression details
   bc->compressed = compressed;
   bc->bitmask = bitmask;
-  bc->first_mismatch_index = first_mismatch_index;
+  bc->first_mismatch_index = 31-first_mismatch_index; //start counting from left
   bc->dictionary_index = dictionary_index;
 
   return compressed;
@@ -265,7 +269,7 @@ bool consecutive_bit_mismatch(unsigned int uncompressed_line, consecutive_bit_mi
 
   cbm->compressed = compressed;
   cbm->dictionary_index = dictionary_index;
-  cbm->first_mismatch_index = first_mismatch_index;
+  cbm->first_mismatch_index = 31 - first_mismatch_index; // start counting from left
 
   return compressed;
 }
@@ -303,8 +307,8 @@ bool nonconsec_2bit_mismatch (unsigned int uncompressed_line, nonconsec_2bit_mis
   ////// update struct values ////
   n2bm->compressed = compressed;
   n2bm->dictionary_index = dictionary_index;
-  n2bm->first_mismatch_index = first_mismatch_index;
-  n2bm-> second_mismatch_index = second_mismatch_index;
+  n2bm->first_mismatch_index = 31 - first_mismatch_index;   //start counting from left
+  n2bm-> second_mismatch_index = 31 - second_mismatch_index;  //start counting from left
 
   return compressed;
 }
@@ -338,52 +342,133 @@ bool RLE_compression(unsigned int index, unsigned int uncompressed_data[], unsig
   return compressed;
 }
 
-// bool compression (unsigned int uncompressed_data[], unsigned int uncompressed_array_size){
+vector<string> compression (unsigned int uncompressed_data[], unsigned int uncompressed_array_size){
+
+  vector <string> compressed_data;
+  ///////////  create initial details of each compression type //////////
+  // bitmask compression 
+  bitmask_compression_t bc;
+  bc.bitmask_size = 4;
+    // direct match 
+  uint8_t dictioanry_index;
+  // consecutive 1,2,4 bit mismatch compression
+  consecutive_bit_mismatch_t cbm_1, cbm_2, cbm_4;
+  cbm_1.mismatch_size = 1;
+  cbm_2.mismatch_size = 2;
+  cbm_4.mismatch_size = 4;
+  // anywhere 2 bit mismatch compression
+  nonconsec_2bit_mismatch_t n2bm;
+  // RLE compression
+  uint8_t repeat_count;
+
+  unsigned int index = 0;
+  bool compressed = 0;
+  bool RLE_compressed_last_word = 0;
+  while (index < uncompressed_array_size){
+    compressed = 0;
+
+    //////////// RLE compression ///////
+    if (!RLE_compressed_last_word){  // RLE compression happens only when last compression is not RLE
+      compressed = RLE_compression(index, uncompressed_data, uncompressed_array_size, &repeat_count);
+      if (compressed){
+        compressed_data.push_back("001" + uint8_to_string(repeat_count,3)) ;
+        // cout << "001" + uint8_to_string(repeat_count,3) << endl;
+        index += repeat_count;
+        RLE_compressed_last_word = 1;
+        continue;
+      }
+    }
+    else{
+      RLE_compressed_last_word = 0;
+    }
+
+    ////////// direct matching /////////
+    compressed = direct_matching(uncompressed_data[index], &dictioanry_index);
+    if (compressed){
+      compressed_data.push_back("111"+uint8_to_string(dictioanry_index,4));
+      // cout << "111"+uint8_to_string(dictioanry_index,4) << "  " << index << endl;
+      index++;
+      continue;
+    }
+    
+    ///////// 1 bit mismatch compression ////////
+    compressed = consecutive_bit_mismatch(uncompressed_data[index],&cbm_1);
+    if (compressed){
+      compressed_data.push_back("011"+uint8_to_string(cbm_1.first_mismatch_index,5)+uint8_to_string(cbm_1.dictionary_index,4));
+      // cout << "011"+uint8_to_string(cbm_1.first_mismatch_index,5)+uint8_to_string(cbm_1.dictionary_index,4) << endl;
+      index++;
+      continue;
+    }
+
+    //////// 2 bit mismatch compression //////////
+    compressed = consecutive_bit_mismatch(uncompressed_data[index],&cbm_2);
+    if (compressed){
+      compressed_data.push_back("100"+uint8_to_string(cbm_2.first_mismatch_index,5)+uint8_to_string(cbm_2.dictionary_index,4));
+      // cout << "100"+uint8_to_string(cbm_2.first_mismatch_index,5)+uint8_to_string(cbm_2.dictionary_index,4) << endl;
+      index++;
+      continue;
+    }
+
+    //////// 4 bit mismatch compression //////////
+    compressed = consecutive_bit_mismatch(uncompressed_data[index],&cbm_4);
+    if (compressed){
+      compressed_data.push_back("101"+uint8_to_string(cbm_4.first_mismatch_index,5)+uint8_to_string(cbm_4.dictionary_index,4));
+      // cout << "101"+uint8_to_string(cbm_4.first_mismatch_index,5)+uint8_to_string(cbm_4.dictionary_index,4) << endl;
+      index++;
+      continue;
+    }
+
+    //////// bitmask compression //////////
+    compressed = bitmask_compression(uncompressed_data[index],&bc);
+    if (compressed){
+      compressed_data.push_back("010"+uint8_to_string(bc.first_mismatch_index,5)+uint8_to_string(bc.bitmask,4)+uint8_to_string(bc.dictionary_index,4));
+      // cout << "010"+uint8_to_string(bc.first_mismatch_index,5)+uint8_to_string(bc.bitmask,4)+uint8_to_string(bc.dictionary_index,4) << endl;
+      index++;
+      continue;
+    }
+
+    /////// 2 bit mismatch anywhere compression  //////////
+    compressed = nonconsec_2bit_mismatch(uncompressed_data[index],&n2bm);
+    if (compressed){
+      compressed_data.push_back("110"+uint8_to_string(n2bm.first_mismatch_index,5)+uint8_to_string(n2bm.second_mismatch_index,5)+uint8_to_string(n2bm.dictionary_index,4));
+      // cout << "110"+uint8_to_string(n2bm.first_mismatch_index,5)+uint8_to_string(n2bm.second_mismatch_index,5)+uint8_to_string(n2bm.dictionary_index,4) << endl;
+      index ++;
+      continue;
+    }
+
+    //////// no compression happens
+    compressed_data.push_back("000"+ uint_to_string(uncompressed_data[index]));
+    // cout << "000"+ uint_to_string(uncompressed_data[index]) << endl;
+    index++;
+  }
+  
+  return compressed_data;
+}
+
+void create_compressed_file(vector<string> &compressed_data){
+  string compressed_text = "";
+  
+  for (int i=0;i<compressed_data.size(); i++){
+    compressed_text += compressed_data[i];
+  }
+  unsigned int length = compressed_text.length();
+  uint8_t extra_0_count = 32 - length % 32;  // add extra zeros at the end of the compressed data to match the size
+  string extra_0s = "";
+  for (int i=0;i<extra_0_count;i++){
+    extra_0s += "0";
+  }
+  compressed_text += extra_0s;
+
+  length = compressed_text.length();  // find the length after adding extra 0s
+  ofstream compressed_file("cout.txt");
+  for (int i=0;i<length;i=i+32){
+    compressed_file << compressed_text.substr(i,32) << endl;    // write the compressed data
+  }
+  compressed_file << "xxxx" << endl;     // middle "xxxx" sign
+
+  for (int i=0; i<DICTIONARY_SIZE; i++){
+    compressed_file << bitset<32>(dictionary[i]) << endl;  // write dictionary entries
+  }
 
 
-//   ///////////  create initial details of each compression type //////////
-//   // bitmask compression 
-//   bitmask_compression_t bc;
-//   bc.bitmask_size = 4;
-//     // direct match 
-//   uint8_t dictioanry_index;
-//   // consecutive 1,2,4 bit mismatch compression
-//   consecutive_bit_mismatch_t cbm_1, cbm_2, cbm_4;
-//   cbm_1.mismatch_size = 1;
-//   cbm_2.mismatch_size = 2;
-//   cbm_4.mismatch_size = 4;
-//   // anywhere 2 bit mismatch compression
-//   nonconsec_2bit_mismatch_t n2bm;
-//   // RLE compression
-//   unsigned int repeat_count;
-
-//   ofstream compressed_file("cout.txt");
-
-//   unsigned int index = 0;
-//   bool compressed = 0;
-
-//   while (index < uncompressed_array_size){
-//     compressed = 0;
-
-//     compressed = RLE_compression(index, uncompressed_data, uncompressed_array_size, &repeat_count);
-//     if (compressed){
-//       uint8_t temp1;
-//       while 
-//       compressed_file.open();
-//       compressed_file << "001" ;
-//       index += repeat_count;
-//       continue;
-//     }
-
-
-
-
-
-//   }
-
-
-
-
-
-
-// }
+}
