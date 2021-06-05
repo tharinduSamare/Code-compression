@@ -23,14 +23,27 @@ typedef struct compressed_data_t{
 void read_compressed_file(vector<compressed_data_t> &compressed_data_vect);
 int string_to_int(string word, uint8_t length);
 void decode_string_to_compressed_lines(string compressed_text, vector<compressed_data_t> &compressed_data_vect);
+unsigned int bitmask_decompression(unsigned int compressed_word);
+unsigned int consecutive_bit_mismatch_decompression(unsigned int compressed_word, uint8_t format);
+unsigned int nonconsec_2bit_mismatch_decompression(unsigned int compressed_word);
+void decompression (unsigned int compressed_word, uint8_t format, vector<unsigned int>&decompressed_data);
+void create_decompressed_file(vector <unsigned int> &decompressed_data);
 
 int main(){
     vector<compressed_data_t> compressed_data_vect;
+    vector<unsigned int> decompressed_data;
+
     read_compressed_file(compressed_data_vect);
     unsigned int compressed_word_count = compressed_data_vect.size();
-    for (auto& it:compressed_data_vect){
-        cout << "format " << unsigned( it.compress_format) << " word " << it.compressed_word << endl;
+    unsigned int decompressed_word = 0;
+
+    for (auto& compressed_obj:compressed_data_vect){
+        // cout << "format " << unsigned( it.compress_format) << " word " << it.compressed_word << endl;
+        decompression(compressed_obj.compressed_word,compressed_obj.compress_format,decompressed_data);
     }
+    create_decompressed_file(decompressed_data);
+
+
 
     return 0;
 }
@@ -164,3 +177,42 @@ unsigned int nonconsec_2bit_mismatch_decompression(unsigned int compressed_word)
     return uncompressed_word;
 }
 
+void decompression (unsigned int compressed_word, uint8_t format, vector<unsigned int>&decompressed_data){
+    unsigned int decompressed_word = 0;
+    if (format == 0){
+        decompressed_word = compressed_word;
+        decompressed_data.push_back(decompressed_word);
+    }
+    else if (format == 1){
+        decompressed_word = decompressed_data.back();
+        for (int i=0;i<compressed_word;i++){
+            decompressed_data.push_back(decompressed_word);
+        }
+    }
+    else if (format == 2){
+        decompressed_word = bitmask_decompression(compressed_word);
+        decompressed_data.push_back(decompressed_word);
+    }
+    else if ((format==3)||(format==4)||(format==5)){
+        decompressed_word = consecutive_bit_mismatch_decompression(compressed_word,format);
+        decompressed_data.push_back(decompressed_word);
+    }
+    else if (format == 6){
+        decompressed_word = nonconsec_2bit_mismatch_decompression(compressed_word);
+        decompressed_data.push_back(decompressed_word);
+    }
+    else {
+        decompressed_word = dictionary_2[compressed_word];
+        decompressed_data.push_back(decompressed_word);
+    }
+}
+
+void create_decompressed_file(vector <unsigned int> &decompressed_data){
+    
+    ofstream decompressed_file("dout.txt");
+    for (auto decompressed_word:decompressed_data){
+        decompressed_file << bitset<32>(decompressed_word) << endl;
+        cout << bitset<32>(decompressed_word) << endl;
+    }
+    decompressed_file.close();
+}
