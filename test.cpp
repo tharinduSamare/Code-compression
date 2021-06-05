@@ -10,12 +10,7 @@ using namespace std;
  
 int main()
 {
-    string k="aaabbbcccdddeeefffggg";
-    ofstream testfile("cout.txt");
-    for (int i=0;i<k.size();i=i+4){
-        testfile << k.substr(i,4) << endl;
-    }
-    testfile << "new ewwee"<< endl;
-    unsigned int p = 23;
-    testfile << bitset<32>(p) << endl;
+    unsigned int k = 200;
+    uint8_t p = k;
+    cout << unsigned(p);
 }

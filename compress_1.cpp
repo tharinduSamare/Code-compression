@@ -469,6 +469,6 @@ void create_compressed_file(vector<string> &compressed_data){
   for (int i=0; i<DICTIONARY_SIZE; i++){
     compressed_file << bitset<32>(dictionary[i]) << endl;  // write dictionary entries
   }
-
-
+  compressed_file.close();
+  return;
 }
