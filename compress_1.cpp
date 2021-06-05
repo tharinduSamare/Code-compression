@@ -10,6 +10,9 @@ using namespace std;
 const int DICTIONARY_SIZE = 16;
 static unsigned int dictionary[DICTIONARY_SIZE];
 static uint8_t RLE_MAX_SIZE = 8;
+static unsigned int test_bit_count = 1;
+static unsigned int test_line_count = 0;
+static unsigned int test_line_position=0;
 
 typedef struct bitmask_compression_t{
   uint8_t bitmask_size;
@@ -121,7 +124,7 @@ string uint8_to_string(uint8_t value, uint8_t bit_count){
 
 string uint_to_string(unsigned int value){
   string string_val = "";
-  for (int8_t i=31;i>0; i--){
+  for (int8_t i=31;i>=0; i--){
     string_val += to_string((value & (1<<i))>>i) ;
   }
   return string_val;
@@ -371,10 +374,16 @@ vector<string> compression (unsigned int uncompressed_data[], unsigned int uncom
     if (!RLE_compressed_last_word){  // RLE compression happens only when last compression is not RLE
       compressed = RLE_compression(index, uncompressed_data, uncompressed_array_size, &repeat_count);
       if (compressed){
-        compressed_data.push_back("001" + uint8_to_string(repeat_count,3)) ;
+        compressed_data.push_back("001" + uint8_to_string((repeat_count-1),3)) ; //0 means 1 repeat, 1 means 2 repeats
         // cout << "001" + uint8_to_string(repeat_count,3) << endl;
         index += repeat_count;
         RLE_compressed_last_word = 1;
+
+        test_line_count = test_bit_count/32+1;
+        test_line_position = test_bit_count % 32;
+        test_bit_count+=6;
+        cout << test_line_count << " " << test_line_position << " " << "001" << endl;
+        
         continue;
       }
     }
@@ -388,6 +397,11 @@ vector<string> compression (unsigned int uncompressed_data[], unsigned int uncom
       compressed_data.push_back("111"+uint8_to_string(dictioanry_index,4));
       // cout << "111"+uint8_to_string(dictioanry_index,4) << "  " << index << endl;
       index++;
+      test_line_count = test_bit_count/32+1;
+      test_line_position = test_bit_count % 32;
+      test_bit_count+= 7;
+      cout << test_line_count << " " << test_line_position << " " << "111" << endl;
+      
       continue;
     }
     
@@ -397,6 +411,10 @@ vector<string> compression (unsigned int uncompressed_data[], unsigned int uncom
       compressed_data.push_back("011"+uint8_to_string(cbm_1.first_mismatch_index,5)+uint8_to_string(cbm_1.dictionary_index,4));
       // cout << "011"+uint8_to_string(cbm_1.first_mismatch_index,5)+uint8_to_string(cbm_1.dictionary_index,4) << endl;
       index++;
+      test_line_count = test_bit_count/32+1;
+      test_line_position = test_bit_count % 32;
+      test_bit_count+=11;
+      cout << test_line_count << " " << test_line_position << " " << "011" << endl;
       continue;
     }
 
@@ -406,6 +424,10 @@ vector<string> compression (unsigned int uncompressed_data[], unsigned int uncom
       compressed_data.push_back("100"+uint8_to_string(cbm_2.first_mismatch_index,5)+uint8_to_string(cbm_2.dictionary_index,4));
       // cout << "100"+uint8_to_string(cbm_2.first_mismatch_index,5)+uint8_to_string(cbm_2.dictionary_index,4) << endl;
       index++;
+      test_line_count = test_bit_count/32+1;
+      test_line_position = test_bit_count % 32;
+      test_bit_count+=11;
+      cout << test_line_count << " " << test_line_position << " " << "100" << endl;
       continue;
     }
 
@@ -415,6 +437,10 @@ vector<string> compression (unsigned int uncompressed_data[], unsigned int uncom
       compressed_data.push_back("101"+uint8_to_string(cbm_4.first_mismatch_index,5)+uint8_to_string(cbm_4.dictionary_index,4));
       // cout << "101"+uint8_to_string(cbm_4.first_mismatch_index,5)+uint8_to_string(cbm_4.dictionary_index,4) << endl;
       index++;
+      test_line_count = test_bit_count/32+1;
+      test_line_position = test_bit_count % 32;
+      test_bit_count+=11;
+      cout << test_line_count << " " << test_line_position << " " << "101" << endl;
       continue;
     }
 
@@ -424,6 +450,10 @@ vector<string> compression (unsigned int uncompressed_data[], unsigned int uncom
       compressed_data.push_back("010"+uint8_to_string(bc.first_mismatch_index,5)+uint8_to_string(bc.bitmask,4)+uint8_to_string(bc.dictionary_index,4));
       // cout << "010"+uint8_to_string(bc.first_mismatch_index,5)+uint8_to_string(bc.bitmask,4)+uint8_to_string(bc.dictionary_index,4) << endl;
       index++;
+      test_line_count = test_bit_count/32+1;
+      test_line_position = test_bit_count % 32;
+      test_bit_count+=16;
+      cout << test_line_count << " " << test_line_position << " " << "010" << endl;
       continue;
     }
 
@@ -433,13 +463,21 @@ vector<string> compression (unsigned int uncompressed_data[], unsigned int uncom
       compressed_data.push_back("110"+uint8_to_string(n2bm.first_mismatch_index,5)+uint8_to_string(n2bm.second_mismatch_index,5)+uint8_to_string(n2bm.dictionary_index,4));
       // cout << "110"+uint8_to_string(n2bm.first_mismatch_index,5)+uint8_to_string(n2bm.second_mismatch_index,5)+uint8_to_string(n2bm.dictionary_index,4) << endl;
       index ++;
+      test_line_count = test_bit_count/32+1;
+      test_line_position = test_bit_count % 32;
+      test_bit_count+=17;
+      cout << test_line_count << " " << test_line_position << " " << "110" << endl;
       continue;
     }
 
     //////// no compression happens
     compressed_data.push_back("000"+ uint_to_string(uncompressed_data[index]));
-    // cout << "000"+ uint_to_string(uncompressed_data[index]) << endl;
+    cout << "000"+ uint_to_string(uncompressed_data[index]) << endl;
     index++;
+    test_line_count = test_bit_count/32+1;
+    test_line_position = test_bit_count % 32;
+    test_bit_count+=35;
+    cout << test_line_count << " " << test_line_position << " " << "000" << endl;
   }
   
   return compressed_data;
@@ -462,7 +500,7 @@ void create_compressed_file(vector<string> &compressed_data){
   length = compressed_text.length();  // find the length after adding extra 0s
   ofstream compressed_file("cout.txt");
   for (int i=0;i<length;i=i+32){
-    compressed_file << compressed_text.substr(i,32) << endl;    // write the compressed data
+    compressed_file << compressed_text.substr(i,32) << endl;    // write the com pressed data
   }
   compressed_file << "xxxx" << endl;     // middle "xxxx" sign
 
