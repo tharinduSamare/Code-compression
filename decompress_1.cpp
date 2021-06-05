@@ -8,19 +8,19 @@
 using namespace std;
 
 const int DICTIONARY_SIZE = 16;
-static unsigned int dictionary_2[DICTIONARY_SIZE];
+static unsigned int dictionary[DICTIONARY_SIZE];
 static uint8_t RLE_MAX_SIZE = 8;
 static uint8_t BITMASK_LENGTH = 4;
 static uint8_t BIT_INDEX_LENGTH = 5;
 static uint8_t DICTIONARY_INDEX_LENGTH = 4;
-static unsigned int testing_index = 1;
+
 
 typedef struct compressed_data_t{
     unsigned int compressed_word;
     uint8_t compress_format;
 }compressed_data_t;
 
-
+void decompression_top();
 void read_compressed_file(vector<compressed_data_t> &compressed_data_vect);
 int string_to_int(string word, uint8_t length);
 void decode_string_to_compressed_lines(string compressed_text, vector<compressed_data_t> &compressed_data_vect);
@@ -32,6 +32,13 @@ void create_decompressed_file(vector <unsigned int> &decompressed_data);
 
 
 int main(){
+
+    decompression_top();
+
+    return 0;
+}
+
+void decompression_top(){
     vector<compressed_data_t> compressed_data_vect;
     vector<unsigned int> decompressed_data;
 
@@ -40,14 +47,9 @@ int main(){
     unsigned int decompressed_word = 0;
 
     for (auto& compressed_obj:compressed_data_vect){
-        // cout << "format " << unsigned( it.compress_format) << " word " << it.compressed_word << endl;
         decompression(compressed_obj.compressed_word,compressed_obj.compress_format,decompressed_data);
     }
     create_decompressed_file(decompressed_data);
-
-
-
-    return 0;
 }
 
 
@@ -67,7 +69,7 @@ void read_compressed_file(vector<compressed_data_t> &compressed_data_vect){
             compressed_text += compressed_line;
         }
         else{
-            dictionary_2[dictionary_index] = (unsigned int )string_to_int(compressed_line,32);
+            dictionary[dictionary_index] = (unsigned int )string_to_int(compressed_line,32);
             dictionary_index ++;  
         }        
     }
@@ -131,7 +133,6 @@ void decode_string_to_compressed_lines(string compressed_text, vector<compressed
         cd.compress_format = format;
         cd.compressed_word = compressed_word;
         compressed_data_vect.push_back(cd);
-        // cout << "format " << bitset<3>(format) << " word " << bitset <32>(compressed_word_size) << endl;
 
         index += compressed_word_size;    // go to the start of the next format + compressed word
     }
@@ -144,7 +145,7 @@ unsigned int bitmask_decompression(unsigned int compressed_word){
     uint8_t bitmask = (compressed_word >> DICTIONARY_INDEX_LENGTH) & ((1<<BITMASK_LENGTH)-1);
     uint8_t dictionary_index = compressed_word & ((1<<DICTIONARY_INDEX_LENGTH)-1);
 
-    unsigned int uncompressed_word = dictionary_2[dictionary_index] ^ (bitmask << (first_mismatch_index-BITMASK_LENGTH+1));
+    unsigned int uncompressed_word = dictionary[dictionary_index] ^ (bitmask << (first_mismatch_index-BITMASK_LENGTH+1));
 
     return uncompressed_word;
 }
@@ -164,7 +165,7 @@ unsigned int consecutive_bit_mismatch_decompression(unsigned int compressed_word
     uint8_t first_mismatch_index = 31 - (compressed_word >> DICTIONARY_INDEX_LENGTH) & ((1<<BIT_INDEX_LENGTH)-1);
     uint8_t dictionary_index = compressed_word & ((1<<DICTIONARY_INDEX_LENGTH)-1);
 
-    unsigned int uncompressed_word = dictionary_2[dictionary_index] ^ (((1<<mismatch_count)-1)<<(first_mismatch_index-BITMASK_LENGTH+1));
+    unsigned int uncompressed_word = dictionary[dictionary_index] ^ (((1<<mismatch_count)-1)<<(first_mismatch_index-BITMASK_LENGTH+1));
     return uncompressed_word;
 }
 
@@ -174,7 +175,7 @@ unsigned int nonconsec_2bit_mismatch_decompression(unsigned int compressed_word)
     uint8_t dictionary_index = compressed_word & ((1<<DICTIONARY_INDEX_LENGTH)-1);
 
     unsigned int mask = (1<< first_mismatch_location) | (1 << second_mismatch_location);
-    unsigned int uncompressed_word = dictionary_2[dictionary_index] ^ mask;
+    unsigned int uncompressed_word = dictionary[dictionary_index] ^ mask;
 
     return uncompressed_word;
 }
@@ -184,40 +185,28 @@ void decompression (unsigned int compressed_word, uint8_t format, vector<unsigne
     if (format == 0){
         decompressed_word = compressed_word;
         decompressed_data.push_back(decompressed_word);
-        cout << testing_index << " "<< unsigned(format) << endl;
-        testing_index ++;
     }
     else if (format == 1){
         decompressed_word = decompressed_data.back();
         for (int i=0;i<(compressed_word+1);i++){
             decompressed_data.push_back(decompressed_word);
-            cout << testing_index << " " << unsigned(format) << endl;
-            testing_index ++;
         }
     }
     else if (format == 2){
         decompressed_word = bitmask_decompression(compressed_word);
         decompressed_data.push_back(decompressed_word);
-        cout << testing_index << " " << unsigned(format) << endl;
-        testing_index ++;
     }
     else if ((format==3)||(format==4)||(format==5)){
         decompressed_word = consecutive_bit_mismatch_decompression(compressed_word,format);
         decompressed_data.push_back(decompressed_word);
-        cout << testing_index << " " << unsigned(format) << endl;
-        testing_index ++;
     }
     else if (format == 6){
         decompressed_word = nonconsec_2bit_mismatch_decompression(compressed_word);
         decompressed_data.push_back(decompressed_word);
-        cout << testing_index << " " << unsigned(format) << endl;
-        testing_index ++;
     }
     else {
-        decompressed_word = dictionary_2[compressed_word];
+        decompressed_word = dictionary[compressed_word];
         decompressed_data.push_back(decompressed_word);
-        cout << testing_index << " " << unsigned(format) << endl;
-        testing_index ++;
     }
 }
 
@@ -226,7 +215,6 @@ void create_decompressed_file(vector <unsigned int> &decompressed_data){
     ofstream decompressed_file("dout.txt");
     for (auto decompressed_word:decompressed_data){
         decompressed_file << bitset<32>(decompressed_word) << endl;
-        // cout << bitset<32>(decompressed_word) << endl;
     }
     decompressed_file.close();
 }
