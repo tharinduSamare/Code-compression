@@ -10,6 +10,9 @@ using namespace std;
 const int DICTIONARY_SIZE = 16;
 static unsigned int dictionary_2[DICTIONARY_SIZE];
 static uint8_t RLE_MAX_SIZE = 8;
+static uint8_t BITMASK_LENGTH = 4;
+static uint8_t BIT_INDEX_LENGTH = 5;
+static uint8_t DICTIONARY_INDEX_LENGTH = 4;
 
 typedef struct compressed_data_t{
     unsigned int compressed_word;
@@ -57,7 +60,6 @@ void read_compressed_file(vector<compressed_data_t> &compressed_data_vect){
     decode_string_to_compressed_lines(compressed_text,compressed_data_vect); // seperate compressed words and their compress formats
 }
 
-
 int string_to_int(string word, uint8_t length){
   int value = 0;
   for (int i=0;i<length;i++){
@@ -66,7 +68,6 @@ int string_to_int(string word, uint8_t length){
   }
   return value;
 }
-
 
 void decode_string_to_compressed_lines(string compressed_text, vector<compressed_data_t> &compressed_data_vect){
     unsigned int index = 0;
@@ -120,3 +121,46 @@ void decode_string_to_compressed_lines(string compressed_text, vector<compressed
         index += compressed_word_size;    // go to the start of the next format + compressed word
     }
 }
+
+unsigned int bitmask_decompression(unsigned int compressed_word){
+
+    ///// extracting each part of the word
+    uint8_t first_mismatch_index = 31 - (compressed_word >> (BITMASK_LENGTH+DICTIONARY_INDEX_LENGTH)) & ((1<<BIT_INDEX_LENGTH)-1); // counting starts from left side
+    uint8_t bitmask = (compressed_word >> DICTIONARY_INDEX_LENGTH) & ((1<<BITMASK_LENGTH)-1);
+    uint8_t dictionary_index = compressed_word & ((1<<DICTIONARY_INDEX_LENGTH)-1);
+
+    unsigned int uncompressed_word = dictionary_2[dictionary_index] ^ (bitmask << first_mismatch_index);
+
+    return uncompressed_word;
+}
+
+unsigned int consecutive_bit_mismatch_decompression(unsigned int compressed_word, uint8_t format){
+    uint8_t mismatch_count = 0;
+    switch (format){
+        case(3):mismatch_count = 1;
+        break;
+        case(4):mismatch_count = 2;
+        break;
+        case(5):mismatch_count = 4;
+        break;
+    }
+
+    //////// extract parts of the compressed word
+    uint8_t first_mismatch_index = 31 - (compressed_word >> DICTIONARY_INDEX_LENGTH) & ((1<<BIT_INDEX_LENGTH)-1);
+    uint8_t dictionary_index = compressed_word & ((1<<DICTIONARY_INDEX_LENGTH)-1);
+
+    unsigned int uncompressed_word = dictionary_2[dictionary_index] ^ (((1<<mismatch_count)-1)<<first_mismatch_index);
+    return uncompressed_word;
+}
+
+unsigned int nonconsec_2bit_mismatch_decompression(unsigned int compressed_word){
+    uint8_t first_mismatch_location = 31 - (compressed_word >> (DICTIONARY_INDEX_LENGTH+BIT_INDEX_LENGTH)) & ((1<<BIT_INDEX_LENGTH)-1);
+    uint8_t second_mismatch_location = 31 - (compressed_word >> DICTIONARY_INDEX_LENGTH) & ((1<< BIT_INDEX_LENGTH)-1);
+    uint8_t dictionary_index = compressed_word & ((1<<DICTIONARY_INDEX_LENGTH)-1);
+
+    unsigned int mask = (1<< first_mismatch_location) | (1 << second_mismatch_location);
+    unsigned int uncompressed_word = dictionary_2[dictionary_index] ^ mask;
+
+    return uncompressed_word;
+}
+
