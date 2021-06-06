@@ -14,8 +14,6 @@ static uint8_t BITMASK_LENGTH = 4;
 static uint8_t BIT_INDEX_LENGTH = 5;
 static uint8_t DICTIONARY_INDEX_LENGTH = 4;
 
-static unsigned int testing_index = 1;
-
 typedef struct bitmask_compression_t{
   uint8_t bitmask_size;
   bool compressed;
@@ -385,7 +383,6 @@ vector<string> compression (unsigned int uncompressed_data[], unsigned int uncom
       compressed = RLE_compression(index, uncompressed_data, uncompressed_array_size, &repeat_count);
       if (compressed){
         compressed_data.push_back("001" + uint8_to_string((repeat_count-1),3)) ; //0 means 1 repeat, 1 means 2 repeats
-        cout << index << " 001"  << endl;
         index += repeat_count;
         RLE_compressed_last_word = 1;
         
@@ -401,7 +398,6 @@ vector<string> compression (unsigned int uncompressed_data[], unsigned int uncom
     compressed = direct_matching(uncompressed_data[index], &dictioanry_index);
     if (compressed){
       compressed_data.push_back("111"+uint8_to_string(dictioanry_index,4));
-      cout << index << " 111" << endl;
       index++;     
        
       continue;
@@ -411,7 +407,6 @@ vector<string> compression (unsigned int uncompressed_data[], unsigned int uncom
     compressed = consecutive_bit_mismatch(uncompressed_data[index],&cbm_1);
     if (compressed){
       compressed_data.push_back("011"+uint8_to_string(cbm_1.first_mismatch_index,5)+uint8_to_string(cbm_1.dictionary_index,4));
-      cout << index << " 011" << endl;
       index++;
       
       continue;
@@ -421,7 +416,6 @@ vector<string> compression (unsigned int uncompressed_data[], unsigned int uncom
     compressed = consecutive_bit_mismatch(uncompressed_data[index],&cbm_2);
     if (compressed){
       compressed_data.push_back("100"+uint8_to_string(cbm_2.first_mismatch_index,5)+uint8_to_string(cbm_2.dictionary_index,4));
-      cout << index << " 100" << endl;
       index++;
       continue;
     }
@@ -430,7 +424,6 @@ vector<string> compression (unsigned int uncompressed_data[], unsigned int uncom
     compressed = consecutive_bit_mismatch(uncompressed_data[index],&cbm_4);
     if (compressed){
       compressed_data.push_back("101"+uint8_to_string(cbm_4.first_mismatch_index,5)+uint8_to_string(cbm_4.dictionary_index,4));
-      cout << index << " 101" << endl;
       index++;
       continue;
     }
@@ -439,7 +432,6 @@ vector<string> compression (unsigned int uncompressed_data[], unsigned int uncom
     compressed = bitmask_compression(uncompressed_data[index],&bc);
     if (compressed){
       compressed_data.push_back("010"+uint8_to_string(bc.first_mismatch_index,5)+uint8_to_string(bc.bitmask,4)+uint8_to_string(bc.dictionary_index,4));
-      cout << index << " 010" << endl;
       index++;
       continue;
     }
@@ -448,14 +440,12 @@ vector<string> compression (unsigned int uncompressed_data[], unsigned int uncom
     compressed = nonconsec_2bit_mismatch(uncompressed_data[index],&n2bm);
     if (compressed){
       compressed_data.push_back("110"+uint8_to_string(n2bm.first_mismatch_index,5)+uint8_to_string(n2bm.second_mismatch_index,5)+uint8_to_string(n2bm.dictionary_index,4));
-      cout << index << " 110" << endl;
       index ++;
       continue;
     }
 
     //////// no compression happens
     compressed_data.push_back("000"+ uint_to_string(uncompressed_data[index]));
-    cout << index << " 000" << endl;
     index++;
   }
   
