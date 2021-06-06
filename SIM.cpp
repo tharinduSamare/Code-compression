@@ -67,12 +67,32 @@ void decompression (unsigned int compressed_word, uint8_t format, vector<unsigne
 void create_decompressed_file(vector <unsigned int> &decompressed_data);
 
 int main ( int argc, char *argv[] ){
-    if (strcmp(argv[1],"1")==0){
-        compression_top();
-    }
-    else if(strcmp(argv[1],"2")==0){
-        decompression_top();
-    }
+  // if (strcmp(argv[1],"1")==0){
+  //     compression_top();
+  // }
+  // else if(strcmp(argv[1],"2")==0){
+  //     decompression_top();
+  // }
+  // unsigned int original_size = 0; // size of the uncompressed dataset
+  ///////// get original data /////
+  // unsigned int* dyn_arr = Read_original(&original_size);  
+  // unsigned int original_data[original_size] = {0};
+
+
+  // for (int i=0;i<original_size;i++){
+  //   original_data[i] = dyn_arr[i];
+  // }
+  // delete[] dyn_arr;
+  
+  // create_dictionary(original_size, original_data);
+
+  // vector<string> compressed_data;
+  // compressed_data =  compression(original_data,original_size);
+
+  // ///////// write compressed data & dictionary to a file ////////
+  // create_compressed_file(compressed_data);
+  compression_top();
+
 
   return 0;
 }
@@ -104,7 +124,7 @@ string uint_to_string(unsigned int value){
 /////////////// compression functions /////////////////////////
 
 void compression_top(){
-      unsigned int original_size = 0; // size of the uncompressed dataset
+  unsigned int original_size = 0; // size of the uncompressed dataset
   ///////// get original data /////
   unsigned int* dyn_arr = Read_original(&original_size);
   unsigned int original_data[original_size] = {0};
@@ -127,7 +147,7 @@ void compression_top(){
 
 unsigned int* Read_original(unsigned int *size){
   string uncompressed_line;
-  ifstream original_file("original.txt");
+  ifstream original_file("test_2_original.txt");
   //////// find the size of original dataset ///
   while(getline(original_file,uncompressed_line)){
     *size = *size + 1;
@@ -137,7 +157,7 @@ unsigned int* Read_original(unsigned int *size){
   unsigned int * original_data = new unsigned int [*size]();
   unsigned int index = 0;
 
-  original_file.open("original.txt");
+  original_file.open("test_2_original.txt");
   while (getline (original_file, uncompressed_line)) {
     original_data[index] = (unsigned int )string_to_int(uncompressed_line,32);
     index++;   
@@ -383,8 +403,10 @@ vector<string> compression (unsigned int uncompressed_data[], unsigned int uncom
       compressed = RLE_compression(index, uncompressed_data, uncompressed_array_size, &repeat_count);
       if (compressed){
         compressed_data.push_back("001" + uint8_to_string((repeat_count-1),3)) ; //0 means 1 repeat, 1 means 2 repeats
+        cout << index << " 001"  << endl;
         index += repeat_count;
         RLE_compressed_last_word = 1;
+        
         
         continue;
       }
@@ -397,7 +419,9 @@ vector<string> compression (unsigned int uncompressed_data[], unsigned int uncom
     compressed = direct_matching(uncompressed_data[index], &dictioanry_index);
     if (compressed){
       compressed_data.push_back("111"+uint8_to_string(dictioanry_index,4));
-      index++;      
+      cout << index << " 111" << endl;
+      index++;     
+       
       continue;
     }
     
@@ -405,7 +429,9 @@ vector<string> compression (unsigned int uncompressed_data[], unsigned int uncom
     compressed = consecutive_bit_mismatch(uncompressed_data[index],&cbm_1);
     if (compressed){
       compressed_data.push_back("011"+uint8_to_string(cbm_1.first_mismatch_index,5)+uint8_to_string(cbm_1.dictionary_index,4));
+      cout << index << " 011" << endl;
       index++;
+      
       continue;
     }
 
@@ -413,6 +439,7 @@ vector<string> compression (unsigned int uncompressed_data[], unsigned int uncom
     compressed = consecutive_bit_mismatch(uncompressed_data[index],&cbm_2);
     if (compressed){
       compressed_data.push_back("100"+uint8_to_string(cbm_2.first_mismatch_index,5)+uint8_to_string(cbm_2.dictionary_index,4));
+      cout << index << " 100" << endl;
       index++;
       continue;
     }
@@ -421,6 +448,7 @@ vector<string> compression (unsigned int uncompressed_data[], unsigned int uncom
     compressed = consecutive_bit_mismatch(uncompressed_data[index],&cbm_4);
     if (compressed){
       compressed_data.push_back("101"+uint8_to_string(cbm_4.first_mismatch_index,5)+uint8_to_string(cbm_4.dictionary_index,4));
+      cout << index << " 101" << endl;
       index++;
       continue;
     }
@@ -429,6 +457,7 @@ vector<string> compression (unsigned int uncompressed_data[], unsigned int uncom
     compressed = bitmask_compression(uncompressed_data[index],&bc);
     if (compressed){
       compressed_data.push_back("010"+uint8_to_string(bc.first_mismatch_index,5)+uint8_to_string(bc.bitmask,4)+uint8_to_string(bc.dictionary_index,4));
+      cout << index << " 010" << endl;
       index++;
       continue;
     }
@@ -437,12 +466,14 @@ vector<string> compression (unsigned int uncompressed_data[], unsigned int uncom
     compressed = nonconsec_2bit_mismatch(uncompressed_data[index],&n2bm);
     if (compressed){
       compressed_data.push_back("110"+uint8_to_string(n2bm.first_mismatch_index,5)+uint8_to_string(n2bm.second_mismatch_index,5)+uint8_to_string(n2bm.dictionary_index,4));
+      cout << index << " 110" << endl;
       index ++;
       continue;
     }
 
     //////// no compression happens
     compressed_data.push_back("000"+ uint_to_string(uncompressed_data[index]));
+    cout << index << " 000" << endl;
     index++;
   }
   
@@ -496,7 +527,7 @@ void decompression_top(){
 void read_compressed_file(vector<compressed_data_t> &compressed_data_vect){
     string compressed_text = "";
     string compressed_line;
-    ifstream compressed_file("compressed.txt");
+    ifstream compressed_file("cout.txt");
     uint8_t dictionary_index = 0;
 
     bool second_part = 0;
