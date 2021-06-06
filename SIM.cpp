@@ -14,6 +14,8 @@ static uint8_t BITMASK_LENGTH = 4;
 static uint8_t BIT_INDEX_LENGTH = 5;
 static uint8_t DICTIONARY_INDEX_LENGTH = 4;
 
+static unsigned int testing_index = 1;
+
 typedef struct bitmask_compression_t{
   uint8_t bitmask_size;
   bool compressed;
@@ -67,32 +69,12 @@ void decompression (unsigned int compressed_word, uint8_t format, vector<unsigne
 void create_decompressed_file(vector <unsigned int> &decompressed_data);
 
 int main ( int argc, char *argv[] ){
-  // if (strcmp(argv[1],"1")==0){
-  //     compression_top();
-  // }
-  // else if(strcmp(argv[1],"2")==0){
-  //     decompression_top();
-  // }
-  // unsigned int original_size = 0; // size of the uncompressed dataset
-  ///////// get original data /////
-  // unsigned int* dyn_arr = Read_original(&original_size);  
-  // unsigned int original_data[original_size] = {0};
-
-
-  // for (int i=0;i<original_size;i++){
-  //   original_data[i] = dyn_arr[i];
-  // }
-  // delete[] dyn_arr;
-  
-  // create_dictionary(original_size, original_data);
-
-  // vector<string> compressed_data;
-  // compressed_data =  compression(original_data,original_size);
-
-  // ///////// write compressed data & dictionary to a file ////////
-  // create_compressed_file(compressed_data);
-  compression_top();
-
+  if (strcmp(argv[1],"1")==0){
+      compression_top();
+  }
+  else if(strcmp(argv[1],"2")==0){
+      decompression_top();
+  }
 
   return 0;
 }
@@ -147,7 +129,7 @@ void compression_top(){
 
 unsigned int* Read_original(unsigned int *size){
   string uncompressed_line;
-  ifstream original_file("test_2_original.txt");
+  ifstream original_file("original.txt");
   //////// find the size of original dataset ///
   while(getline(original_file,uncompressed_line)){
     *size = *size + 1;
@@ -157,7 +139,7 @@ unsigned int* Read_original(unsigned int *size){
   unsigned int * original_data = new unsigned int [*size]();
   unsigned int index = 0;
 
-  original_file.open("test_2_original.txt");
+  original_file.open("original.txt");
   while (getline (original_file, uncompressed_line)) {
     original_data[index] = (unsigned int )string_to_int(uncompressed_line,32);
     index++;   
@@ -527,7 +509,7 @@ void decompression_top(){
 void read_compressed_file(vector<compressed_data_t> &compressed_data_vect){
     string compressed_text = "";
     string compressed_line;
-    ifstream compressed_file("cout.txt");
+    ifstream compressed_file("compressed.txt");
     uint8_t dictionary_index = 0;
 
     bool second_part = 0;
@@ -627,7 +609,8 @@ unsigned int consecutive_bit_mismatch_decompression(unsigned int compressed_word
     uint8_t first_mismatch_index = 31 - (compressed_word >> DICTIONARY_INDEX_LENGTH) & ((1<<BIT_INDEX_LENGTH)-1);
     uint8_t dictionary_index = compressed_word & ((1<<DICTIONARY_INDEX_LENGTH)-1);
 
-    unsigned int uncompressed_word = dictionary[dictionary_index] ^ (((1<<mismatch_count)-1)<<(first_mismatch_index-BITMASK_LENGTH+1));
+    unsigned int uncompressed_word = dictionary[dictionary_index] ^ (((1<<mismatch_count)-1)<<(first_mismatch_index-mismatch_count+1));
+     
     return uncompressed_word;
 }
 
